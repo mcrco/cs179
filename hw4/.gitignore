@@ -1,0 +1,21 @@
+# Nested coursework checkout: delete asst3/.git if you need files tracked in this repo (git ignore alone will not fix embedded repos).
+
+# Build artifacts
+asst3/**/objs/
+asst3/**/*.o
+asst3/**/*.d
+
+# Logs and rendered frames
+asst3/**/logs/
+asst3/**/*.ppm
+
+# Binaries (rebuild with make, or restore from assignment distribution)
+asst3/saxpy/cudaSaxpy
+asst3/render/render
+asst3/scan/cudaScan
+asst3/render/render_ref
+asst3/render/render_ref_x86
+asst3/render/render_ref_x86.bin
+asst3/scan/cudaScan_ref
+asst3/scan/cudaScan_ref_x86
+asst3/scan/cudaScan_ref_x86.real

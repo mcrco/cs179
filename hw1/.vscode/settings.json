@@ -1,0 +1,11 @@
+{
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/usr/bin/c++,/usr/local/cuda-12.5/bin/nvcc"
+  ],
+  "files.associations": {
+    "README": "plaintext",
+    "*.cu": "cpp",
+    "*.cuh": "cpp"
+  }
+}

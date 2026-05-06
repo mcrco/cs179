@@ -1,0 +1,9 @@
+/build
+.DS_Store
+/cmake-build-*
+/.idea
+/.cache
+/out.wav
+/out_silo.wav
+*.ncu-rep
+*.swp

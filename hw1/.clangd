@@ -1,0 +1,16 @@
+CompileFlags:
+  CompilationDatabase: build
+
+---
+If:
+  PathMatch: .*\.cuh?$
+CompileFlags:
+  Compiler: /usr/bin/c++
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --options-file
+    - CMakeFiles/*/includes_CUDA.rsp
+    - -arch=*
+  Add:
+    - --cuda-path=/usr/local/cuda
+    - -I/usr/local/cuda/targets/x86_64-linux/include
