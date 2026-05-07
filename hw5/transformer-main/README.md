@@ -52,10 +52,14 @@ Instead, we will implement matrix-vector multiply with standard fused-multiply-a
 What is ratio of BF16 tensor core FLOPS to BF16 non-tensor core FLOPS on an A100-PCIE-40GB GPU?
 Note: NVIDIA and AMD marketing both try to inflate their performance by measuring "sparse" tensor core operations, but nobody uses those.
 
+The [specs](https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/nvidia-a100-datasheet-us-nvidia-1758950-r4-web.pdf) say that the BF16 tensor core dense performance is 312 TFLOPS and FP32 tensor core dense performance is 19.5 TFLOPS, for a ratio of 16.
+
 ### Question 1.2 (5 points)
 What is the expected speedup of tensor cores vs non-tensor cores for matrix-vector multiplication on an A100-PCIE-40GB GPU?
 Make an argument based on arithmetic intensity (FLOPS is not the whole story).
 Assume the matrix and vector are read from off-chip memory.
+
+The memory bandwidth is around 1555GB/s, which is (1555 * 10^9 bytes / 2 bytes) / 10^12 = 0.7775 BF16 floats. Since this is much less than 0.7775 < 312 and 19.5, the limiting factor is the loading of the data. Thus, there is no speedup at all for tensor vs non-tensor cores.
 
 ### Coding (80 points)
 Implement GPU operators:
