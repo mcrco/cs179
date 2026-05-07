@@ -74,7 +74,7 @@ __global__ void argmaxKernel(ValueIndexPair *data, ValueIndexPair *result, int n
     __syncthreads();
 
     for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tidx < s && tidx + s < n) {
+        if (tidx < s) {
             partial_argmaxes[tidx] = pair_argmax(partial_argmaxes[tidx], partial_argmaxes[tidx + s]);
         }
         __syncthreads();
