@@ -7,8 +7,7 @@
 #include "../gpu_ops/SiLUMult.cuh"
 #include "../HostBuffer.h"
 
-int main() {
-    int32_t len = 12345;
+void test_silu_mult(int32_t len) {
     auto x = std::make_shared<CudaBuffer>(len * sizeof(__nv_bfloat16));
     __nv_bfloat16 *x_bf16 = static_cast<__nv_bfloat16*>(x->data);
     auto y = std::make_shared<CudaBuffer>(len * sizeof(__nv_bfloat16));
@@ -32,4 +31,9 @@ int main() {
     cudaStreamSynchronize(cudaStreamPerThread);
 
     check_bf16_allclose(x_bf16, out_cpu_bf16, len);
+}
+
+int main() {
+    test_silu_mult(12345);
+    test_silu_mult(4864);
 }

@@ -47,4 +47,5 @@ int main() {
     test_argmax(1);
     test_argmax(1234);
     test_argmax(321234);
+    test_argmax(151936);
 }

@@ -5,10 +5,7 @@
 #include "../gpu_ops/MatrixVectorMultiply.cuh"
 #include "TestUtils.cuh"
 
-int main() {
-    // when debugging, it may be helpful to lower dimensions
-    int32_t m = 12345;
-    int32_t k = 800;
+void test_matvec(int32_t m, int32_t k) {
     auto mat = std::make_shared<CudaBuffer>(m * k * sizeof(__nv_bfloat16));
     __nv_bfloat16 *mat_bf16 = static_cast<__nv_bfloat16*>(mat->data);
     auto in_vec = std::make_shared<CudaBuffer>(k * sizeof(__nv_bfloat16));
@@ -48,4 +45,11 @@ int main() {
     cudaStreamSynchronize(cudaStreamPerThread);
 
     check_bf16_allclose(out_vec_bf16, cpu_out, m);
+}
+
+int main() {
+    // when debugging, it may be helpful to lower dimensions
+    test_matvec(12345, 800);
+    // Qwen2 0.5B hidden projection shape
+    test_matvec(896, 896);
 }

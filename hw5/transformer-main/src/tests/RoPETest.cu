@@ -5,9 +5,7 @@
 #include "../gpu_ops/RoPE.cuh"
 #include "TestUtils.cuh"
 
-int main() {
-    int32_t num_heads = 4;
-    int32_t head_dim = 256; // head_dim must be even
+void test_rope(int32_t num_heads, int32_t head_dim) {
     int32_t position_idx = 13;
     float theta_base = 1e6f;
 
@@ -56,4 +54,10 @@ int main() {
     cudaStreamSynchronize(cudaStreamPerThread);
 
     check_bf16_allclose(queries_bf16, cpu_out, num_heads * head_dim);
+}
+
+int main() {
+    test_rope(4, 256);
+    // Qwen2 0.5B query RoPE shape
+    test_rope(14, 64);
 }

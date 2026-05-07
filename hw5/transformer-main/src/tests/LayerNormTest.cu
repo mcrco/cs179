@@ -5,8 +5,7 @@
 #include "../gpu_ops/LayerNorm.cuh"
 #include "TestUtils.cuh"
 
-int main() {
-    int32_t hidden_dim = 8000;
+void test_layernorm(int32_t hidden_dim) {
     auto weights_vec = std::make_shared<CudaBuffer>(hidden_dim * sizeof(__nv_bfloat16));
     __nv_bfloat16 *weights_bf16 = static_cast<__nv_bfloat16*>(weights_vec->data);
     auto in_vec = std::make_shared<CudaBuffer>(hidden_dim * sizeof(__nv_bfloat16));
@@ -48,4 +47,9 @@ int main() {
         cudaStreamSynchronize(cudaStreamPerThread);
         check_bf16_allclose(out_vec_bf16, cpu_out, hidden_dim);
     }
+}
+
+int main() {
+    test_layernorm(8000);
+    test_layernorm(896);
 }
