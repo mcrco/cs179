@@ -79,6 +79,27 @@ For example:
 - Explain how the performance would be different in another scenario (e.g. longer sequence length, larger model, increased batch size)
 - Explain similarities across the kernels
 
+- Argmax
+  - compute bound (see speed of light)
+  - probably because the reduction is the main part
+  - also maybe bank conflict? shared memory request/response throughput are not even, not sure why that is
+- Layernorm
+  - split into sum of squares kernel (RMS) + layernorm kernel btw
+  - numbers look a little funky, but sum of squares kernel should be compute-limited since it's a reduction just like argmax
+  - layernorm should be memory-bound, decent L2 cache hit rate though so I think my gmem accesses are coalesced enough
+- Matmul
+  - limited by memory access (see speed of light + memory chart)
+  - we load entire row of values per every output value from gmem
+  - iirc there's an algorithm to "tile" the memory loading for matmuls and load tiles into shared memory and then compute then aggregate final values. should try that next
+  - gmem reads are very coalesced tho (high L1 cache hit rate)
+  - probably the most important since this definitely used the most compute
+- Rope
+  - memory-bound since computation is just angles + cosine
+  - gmem acceses are pretty coalesced (high cache hit rate, see memory chart)
+- Silu
+  - memory-bound since computation is one multiplication + sigmoid
+  - once again, gmem accesses are pretty coalesced (high cache hit rate, see memory chart)
+
 ## Part 2 (second week)
 
 To submit, zip your repository to `~/lab6_2025_submission.zip`.
