@@ -1,6 +1,7 @@
 #include "ArgMax.cuh"
 #include <cfloat>
 #include <cuda_bf16.h>
+#include <fcntl.h>
 #include <memory>
 #include <algorithm>
 #include "../ErrorCheck.h"
@@ -28,8 +29,7 @@ __device__ inline ValueIndexPair pair_argmax(ValueIndexPair a, ValueIndexPair b)
 }
 
 ArgMax::ArgMax(int32_t len) {
-    temp_space = std::make_shared<CudaBuffer>(len * sizeof(ValueIndexPair));
-    result_space = std::make_shared<CudaBuffer>(sizeof(ValueIndexPair));
+    temp_space = std::make_shared<CudaBuffer>(sizeof(ValueIndexPair));
 }
 
 /** atomicMax from hw3:
@@ -58,7 +58,7 @@ __device__ static void atomicArgMax(ValueIndexPair *pair, ValueIndexPair other) 
     } while (assumed != old);
 }
 
-__global__ void argmaxKernel(ValueIndexPair *data, ValueIndexPair *result, int n) {
+__global__ void argmaxKernel(__nv_bfloat16 *data, ValueIndexPair *result, int n) {
     extern __shared__ ValueIndexPair partial_argmaxes[];
 
     int tidx = threadIdx.x;
@@ -67,7 +67,7 @@ __global__ void argmaxKernel(ValueIndexPair *data, ValueIndexPair *result, int n
 
     ValueIndexPair local_argmax = {-FLT_MAX, -1};
     for (int i = idx; i < n; i += stride) {
-        ValueIndexPair input = data[i];
+        ValueIndexPair input = {__bfloat162float(data[i]), i};
         local_argmax = pair_argmax(local_argmax, input);
     }
     partial_argmaxes[tidx] = local_argmax;
@@ -88,15 +88,9 @@ __global__ void argmaxKernel(ValueIndexPair *data, ValueIndexPair *result, int n
 int32_t *ArgMax::bf16_argmax(const std::shared_ptr<CudaBuffer> &bf16_data, cudaStream_t stream) {
     int n = bf16_data->size / sizeof(__nv_bfloat16);
 
-    // Copy and cast bf16 data to temp.
-    __nv_bfloat16* bf16_input = static_cast<__nv_bfloat16*>(bf16_data->data);
-    ValueIndexPair* pairs = static_cast<ValueIndexPair*>(temp_space->data);
-    for (int i = 0; i < n; i++) {
-        pairs[i].val = __bfloat162float(bf16_input[i]);
-        pairs[i].idx = i;
-    }
-
-    ValueIndexPair* result = static_cast<ValueIndexPair*>(result_space->data);
+    __nv_bfloat16 *data = static_cast<__nv_bfloat16*>(bf16_data->data);
+    // We will argmax return value in class member.
+    ValueIndexPair* result = static_cast<ValueIndexPair*>(temp_space->data);
     result->val = -FLT_MAX;
     result->idx = -1;
 
@@ -104,7 +98,7 @@ int32_t *ArgMax::bf16_argmax(const std::shared_ptr<CudaBuffer> &bf16_data, cudaS
     int threads = ARGMAX_THREADS;
     int blocks = min((n + threads - 1) / threads, ARGMAX_MAX_BLOCKS);
     int shared_mem_size = threads * sizeof(ValueIndexPair);
-    argmaxKernel<<<blocks, threads, shared_mem_size, stream>>>(pairs, result, n);
+    argmaxKernel<<<blocks, threads, shared_mem_size, stream>>>(data, result, n);
     checkCuda(cudaGetLastError());
 
     return &result->idx;
