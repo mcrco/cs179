@@ -108,9 +108,13 @@ To submit, zip your repository to `~/lab6_2025_submission.zip`.
 List all the matrix-vector multiplies in a Qwen2 0.5B layer, including the (M, K) dimensions of the matrix.
 (Do not include grouped-query attention).
 
+After the self attention layer, there's an MLP with 3 linear layers: gate, up, and down. The gate and up layers are 4864 x 896 and the down layer is 896 x 4864.
+
 ### Question 2.2 (2 points)
 Treating each query head as a row of a matrix, what are the dimensions of the matrix-matrix multiply in a
 Qwen2 0.5B layer grouped-query attention operation? Assume current sequence length is 1234 tokens.
+
+
 
 ### Question 2.3 (5 points)
 Assuming off-chip memory bandwidth is the limiting factor, what is the theoretical minimum inference latency (in ms)

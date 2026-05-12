@@ -3,6 +3,7 @@
 #include "../qwen2/Qwen2Config.h"
 #include "../CudaBuffer.cuh"
 #include <cuda_bf16.h>
+#include <cstdint>
 #include <memory>
 #include "../ErrorCheck.h"
 
@@ -14,9 +15,7 @@ public:
     /**
      * Allocate temporary space
      */
-    explicit GroupQueryAttention(int32_t max_seq_len) {
-        // TODO
-    }
+    explicit GroupQueryAttention(int32_t max_seq_len) {}
 
     /**
      * Scaled dot product attention with grouped queries, see https://arxiv.org/abs/2305.13245.
@@ -36,7 +35,5 @@ public:
      * @param seq_len current sequence length
      * @param stream CUDA stream for asynchronous operation
      */
-    void sdpa(__nv_bfloat16 *queries, __nv_bfloat16 *k_cache, __nv_bfloat16 *v_cache, float *weighted_values, int32_t layer_num, int32_t seq_len, cudaStream_t stream) {
-        // TODO
-    }
+    void sdpa(__nv_bfloat16 *queries, __nv_bfloat16 *k_cache, __nv_bfloat16 *v_cache, float *weighted_values, int32_t layer_num, int32_t seq_len, cudaStream_t stream);
 };
