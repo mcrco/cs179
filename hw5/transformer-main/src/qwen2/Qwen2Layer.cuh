@@ -15,13 +15,15 @@
 
 template<Qwen2Size QWEN2_SIZE>
 class Qwen2Layer {
+    std::shared_ptr<CudaBuffer> queries;
+    std::shared_ptr<CudaBuffer> attention_output;
+    std::shared_ptr<CudaBuffer> gate_proj;
+    std::shared_ptr<CudaBuffer> up_proj;
+    std::shared_ptr<CudaBuffer> down_proj;
 public:
     using Qwen2Config = Qwen2Config<QWEN2_SIZE>;
 
-    Qwen2Layer(uint32_t layer_num, uint32_t max_seq_len):
-    layer_num(layer_num), input_layernorm(Qwen2Config::hidden_size()), post_attention_layernorm(Qwen2Config::hidden_size()) {
-        // TODO
-    }
+    Qwen2Layer(uint32_t layer_num, uint32_t max_seq_len);
 
     uint32_t layer_num;
     LayerNorm input_layernorm;                              // (hidden_size,)
@@ -45,7 +47,5 @@ public:
      * @param seq_len current sequence length
      * @param stream CUDA stream for asynchronous operation
      */
-    void forward(const std::shared_ptr<CudaBuffer>& k_cache, const std::shared_ptr<CudaBuffer> &v_cache, const std::shared_ptr<CudaBuffer> &hidden_state, int32_t seq_len, cudaStream_t stream) {
-        // TODO
-    }
+    void forward(const std::shared_ptr<CudaBuffer>& k_cache, const std::shared_ptr<CudaBuffer> &v_cache, const std::shared_ptr<CudaBuffer> &hidden_state, int32_t seq_len, cudaStream_t stream);
 };

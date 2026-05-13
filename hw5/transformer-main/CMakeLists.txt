@@ -21,6 +21,7 @@ add_library(transformer_lib
         src/ErrorCheck.h
         src/qwen2/Qwen2Config.h
         src/qwen2/Qwen2Layer.cuh
+        src/qwen2/Qwen2Layer.cu
         src/qwen2/Qwen2Model.cuh
         src/qwen2/Qwen2Loader.h
         src/qwen2/Qwen2Loader.cu
