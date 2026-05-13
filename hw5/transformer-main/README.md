@@ -165,6 +165,8 @@ How many microseconds per layer does your implementation take?
 What is the slowest part of the layer and why?
 Include screenshots of the something interesting you notice, and explain.
 
+My implementation takes 2160 microseconds per layer. The slowest part is the SDPA kernel. Something interesting I noticed in the mem chart for the SDPA kernel (`profiling/sdpa.png`) was that I was getting a L2 cache hit rate of over 100%. Apparently this is because there isn't a specific hit/miss counter, and the hit rate is actuall derived from some other counters, like sector lookups for L2/DRAM.
+
 ## Assignment notes
 
 - Your kernels must fully occupy the GPU when possible (i.e. do not launch with only 1 block, launch with many).
