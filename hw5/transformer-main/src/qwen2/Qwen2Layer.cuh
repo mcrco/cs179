@@ -15,8 +15,10 @@
 
 template<Qwen2Size QWEN2_SIZE>
 class Qwen2Layer {
+    std::shared_ptr<CudaBuffer> norm_hidden_state;
     std::shared_ptr<CudaBuffer> queries;
     std::shared_ptr<CudaBuffer> attention_output;
+    std::shared_ptr<CudaBuffer> attention_proj;
     std::shared_ptr<CudaBuffer> gate_proj;
     std::shared_ptr<CudaBuffer> up_proj;
     std::shared_ptr<CudaBuffer> down_proj;
