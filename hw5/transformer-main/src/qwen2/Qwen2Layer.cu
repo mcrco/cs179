@@ -102,6 +102,7 @@ void Qwen2Layer<QWEN2_SIZE>::forward(const std::shared_ptr<CudaBuffer>& k_cache,
     MatrixVectorMultiply::bf16_matmul(Qwen2Config::intermediate_size(), Qwen2Config::hidden_size(), down_proj_weight_ptr, nullptr, gate_proj_ptr, down_proj_ptr, stream);
     // Add back to hidden state via residual.
     residualAddKernel<__nv_bfloat16><<<blocks, threads, 0, stream>>>(hidden_state_ptr, down_proj_ptr, Qwen2Config::hidden_size());
+    checkCuda(cudaGetLastError());
 }
 
 template class Qwen2Layer<QWEN2_0_5B>;
