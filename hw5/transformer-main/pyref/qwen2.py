@@ -1,9 +1,10 @@
-import safetensors
-from pathlib import Path
 import json
-from dataclasses import dataclass
-import torch
 import math
+from dataclasses import dataclass
+from pathlib import Path
+
+import safetensors
+import torch
 from rope import RoPE
 
 
@@ -24,7 +25,7 @@ class Qwen2Config:
     # If the input embedding matrix is the same as the output logit matrix
     # This is a trick to reduce size in lower parameter count models
     embedding_tying: bool
-    
+
     def queries_size(self) -> int:
         """
         Size of all queries grouped together.
@@ -41,7 +42,7 @@ class Qwen2Config:
         128 for 0.5B.
         """
         return self.head_size * self.num_kv_heads
-    
+
     def value_size(self) -> int:
         """
         For Qwen2, value size is the same as query/key size.
@@ -57,7 +58,9 @@ class Qwen2Config:
         return self.value_size() * self.num_kv_heads
 
 
-def t5_layer_norm(weight: torch.Tensor, hidden_state: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+def t5_layer_norm(
+    weight: torch.Tensor, hidden_state: torch.Tensor, eps: float = 1e-6
+) -> torch.Tensor:
     """Layer normalization without bias, as used in the T5 paper https://arxiv.org/pdf/1910.10683"""
     variance = hidden_state.pow(2).mean()
     # scale to unit variance (eps for numerical stability)
@@ -89,7 +92,9 @@ class Qwen2Layer:
     gate_proj_weight: torch.Tensor  # (intermediate_size, hidden_size)
     down_proj_weight: torch.Tensor  # (hidden_size, intermediate_size)
 
-    def forward(self, keys: torch.Tensor, values: torch.Tensor, hidden_state: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, keys: torch.Tensor, values: torch.Tensor, hidden_state: torch.Tensor
+    ) -> torch.Tensor:
         """
         keys: (seq_len, num_layers, keys_size). However, only seq_len - 1 are initially populated, this function call will fill in the last token.
         values: (seq_len, num_layers, values_size). Only seq_len - 1 are initially populated.
@@ -101,25 +106,51 @@ class Qwen2Layer:
         attn_input = t5_layer_norm(self.input_layernorm, hidden_state)  # (hidden_size,)
 
         # self attention
-        queries = self.q_proj_weight @ attn_input + self.q_proj_bias  # (num_query_heads * head_size,)
+        queries = (
+            self.q_proj_weight @ attn_input + self.q_proj_bias
+        )  # (num_query_heads * head_size,)
         # separate into heads
-        queries = queries.view((self.config.num_query_heads, self.config.head_size))  # (num_query_heads, head_size)
+        queries = queries.view(
+            (self.config.num_query_heads, self.config.head_size)
+        )  # (num_query_heads, head_size)
         queries = RoPE.apply_rope_to_qk(queries, seq_len - 1)
 
         new_keys = self.k_proj_weight @ attn_input + self.k_proj_bias  # (keys_size,)
-        new_keys = new_keys.view((self.config.num_kv_heads, self.config.head_size))  # (num_kv_heads, head_size)
+        new_keys = new_keys.view(
+            (self.config.num_kv_heads, self.config.head_size)
+        )  # (num_kv_heads, head_size)
         new_keys = RoPE.apply_rope_to_qk(new_keys, seq_len - 1)
-        new_keys = new_keys.view((self.config.num_kv_heads * self.config.head_size))  # (keys_size,)
+        new_keys = new_keys.view(
+            (self.config.num_kv_heads * self.config.head_size)
+        )  # (keys_size,)
         # add last token to KV cache
         keys[-1, self.layer_num, :] = new_keys
         # separate into heads
-        keys = keys.view((seq_len, self.config.num_layers, self.config.num_kv_heads, self.config.head_size))
+        keys = keys.view(
+            (
+                seq_len,
+                self.config.num_layers,
+                self.config.num_kv_heads,
+                self.config.head_size,
+            )
+        )
 
-        new_values = self.v_proj_weight @ attn_input + self.v_proj_bias  # (values_size,)
+        new_values = (
+            self.v_proj_weight @ attn_input + self.v_proj_bias
+        )  # (values_size,)
         values[-1, self.layer_num, :] = new_values
-        values = values.view((seq_len, self.config.num_layers, self.config.num_kv_heads, self.config.value_size()))
+        values = values.view(
+            (
+                seq_len,
+                self.config.num_layers,
+                self.config.num_kv_heads,
+                self.config.value_size(),
+            )
+        )
 
-        weighted_values = torch.zeros((self.config.num_query_heads, self.config.value_size()))  # (num_query_heads, value_size)
+        weighted_values = torch.zeros(
+            (self.config.num_query_heads, self.config.value_size())
+        )  # (num_query_heads, value_size)
 
         # group query attention
         for head_idx in range(self.config.num_query_heads):
@@ -130,7 +161,9 @@ class Qwen2Layer:
             head_keys = keys[:, self.layer_num, key_idx, :]  # (seq_len, head_size)
 
             # dot product of query with all keys, scaled by 1/sqrt(d_k)
-            attn_vals_raw = (head_query @ head_keys.T) / math.sqrt(self.config.head_size)  # (seq_len,)
+            attn_vals_raw = (head_query @ head_keys.T) / math.sqrt(
+                self.config.head_size
+            )  # (seq_len,)
 
             # numerically stable softmax
             attn_max = torch.max(attn_vals_raw)
@@ -141,9 +174,11 @@ class Qwen2Layer:
             # weighted sum of values
             head_values = values[:, self.layer_num, key_idx, :]  # (seq_len, value_size)
             weighted_values[head_idx] = attn_vals_softmax @ head_values
-        
+
         # view contiguously
-        weighted_values = weighted_values.view((self.config.num_query_heads * self.config.value_size()))
+        weighted_values = weighted_values.view(
+            (self.config.num_query_heads * self.config.value_size())
+        )
         attn_output = self.o_proj_weight @ weighted_values
 
         # residual connection
@@ -152,7 +187,9 @@ class Qwen2Layer:
         # pre-FFN layernorm
         ffn_input = t5_layer_norm(self.post_attention_layernorm, hidden_state)
         # feed forward network with gated linear unit
-        ffn_output = self.down_proj_weight @ (silu(self.gate_proj_weight @ ffn_input) * (self.up_proj_weight @ ffn_input))
+        ffn_output = self.down_proj_weight @ (
+            silu(self.gate_proj_weight @ ffn_input) * (self.up_proj_weight @ ffn_input)
+        )
 
         # residual connection
         hidden_state += ffn_output
@@ -168,42 +205,78 @@ class Qwen2Model:
     # final layernorm: (hidden_size)
     final_layernorm: torch.Tensor
 
-    def __init__(self, model_dir: Path, dtype: torch.dtype=torch.float32):
+    def __init__(self, model_dir: Path, dtype: torch.dtype = torch.float32):
         with open(model_dir / "config.json", "r") as f:
             config_obj = json.load(f)
         self.config = Qwen2Config(
             hidden_size=config_obj["hidden_size"],
             num_layers=config_obj["num_hidden_layers"],
-            num_query_heads=config_obj["num_attention_heads"], 
+            num_query_heads=config_obj["num_attention_heads"],
             num_kv_heads=config_obj["num_key_value_heads"],
             head_size=config_obj["hidden_size"] // config_obj["num_attention_heads"],
             intermediate_size=config_obj["intermediate_size"],
-            embedding_tying=config_obj["tie_word_embeddings"]
+            embedding_tying=config_obj["tie_word_embeddings"],
         )
 
-        with safetensors.safe_open(model_dir / "model.safetensors", framework="pt") as tensors:
-            self.embedding_weight = tensors.get_tensor("model.embed_tokens.weight").to(dtype)
+        with safetensors.safe_open(
+            model_dir / "model.safetensors", framework="pt"
+        ) as tensors:
+            self.embedding_weight = tensors.get_tensor("model.embed_tokens.weight").to(
+                dtype
+            )
             self.layers = []
             for i in range(self.config.num_layers):
-                self.layers.append(Qwen2Layer(
-                    config=self.config,
-                    layer_num=i,
-                    input_layernorm=tensors.get_tensor(f"model.layers.{i}.input_layernorm.weight").to(dtype),
-                    q_proj_weight=tensors.get_tensor(f"model.layers.{i}.self_attn.q_proj.weight").to(dtype),
-                    q_proj_bias=tensors.get_tensor(f"model.layers.{i}.self_attn.q_proj.bias").to(dtype),
-                    k_proj_weight=tensors.get_tensor(f"model.layers.{i}.self_attn.k_proj.weight").to(dtype), 
-                    k_proj_bias=tensors.get_tensor(f"model.layers.{i}.self_attn.k_proj.bias").to(dtype),
-                    v_proj_weight=tensors.get_tensor(f"model.layers.{i}.self_attn.v_proj.weight").to(dtype),
-                    v_proj_bias=tensors.get_tensor(f"model.layers.{i}.self_attn.v_proj.bias").to(dtype),
-                    o_proj_weight=tensors.get_tensor(f"model.layers.{i}.self_attn.o_proj.weight").to(dtype),
-                    post_attention_layernorm=tensors.get_tensor(f"model.layers.{i}.post_attention_layernorm.weight").to(dtype),
-                    up_proj_weight=tensors.get_tensor(f"model.layers.{i}.mlp.up_proj.weight").to(dtype),
-                    gate_proj_weight=tensors.get_tensor(f"model.layers.{i}.mlp.gate_proj.weight").to(dtype),
-                    down_proj_weight=tensors.get_tensor(f"model.layers.{i}.mlp.down_proj.weight").to(dtype)
-                ))
+                self.layers.append(
+                    Qwen2Layer(
+                        config=self.config,
+                        layer_num=i,
+                        input_layernorm=tensors.get_tensor(
+                            f"model.layers.{i}.input_layernorm.weight"
+                        ).to(dtype),
+                        q_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.q_proj.weight"
+                        ).to(dtype),
+                        q_proj_bias=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.q_proj.bias"
+                        ).to(dtype),
+                        k_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.k_proj.weight"
+                        ).to(dtype),
+                        k_proj_bias=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.k_proj.bias"
+                        ).to(dtype),
+                        v_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.v_proj.weight"
+                        ).to(dtype),
+                        v_proj_bias=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.v_proj.bias"
+                        ).to(dtype),
+                        o_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.self_attn.o_proj.weight"
+                        ).to(dtype),
+                        post_attention_layernorm=tensors.get_tensor(
+                            f"model.layers.{i}.post_attention_layernorm.weight"
+                        ).to(dtype),
+                        up_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.mlp.up_proj.weight"
+                        ).to(dtype),
+                        gate_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.mlp.gate_proj.weight"
+                        ).to(dtype),
+                        down_proj_weight=tensors.get_tensor(
+                            f"model.layers.{i}.mlp.down_proj.weight"
+                        ).to(dtype),
+                    )
+                )
             self.final_layernorm = tensors.get_tensor("model.norm.weight").to(dtype)
 
-    def forward(self, keys: torch.Tensor, values: torch.Tensor, input_tok_id: int, temperature: float) -> int:
+    def forward(
+        self,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        input_tok_id: int,
+        temperature: float,
+    ) -> int:
         """
         keys: (seq_len, num_layers, keys_size). Only seq_len - 1 are initially populated, this function call will fill in the last token.
         values: (seq_len, num_layers, values_size)
@@ -220,12 +293,14 @@ class Qwen2Model:
         # final layernorm
         hidden_state = t5_layer_norm(self.final_layernorm, hidden_state)
 
-        assert self.config.embedding_tying, "current implementation only support embedding tying"
+        assert self.config.embedding_tying, (
+            "current implementation only support embedding tying"
+        )
         output_scores = hidden_state @ self.embedding_weight.T
         if temperature == 0:
             # softmax is monotonic, so we can sample the largest value directly
             new_token = torch.argmax(output_scores)
         else:
-            raise ValueError('temperature > 0 not supported')
+            raise ValueError("temperature > 0 not supported")
 
         return int(new_token)
